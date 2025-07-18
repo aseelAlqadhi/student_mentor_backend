@@ -1,0 +1,17 @@
+# Python virtual environment
+venv/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Git
+.git
+.gitignore
+
+# VS Code settings
+.vscode/
+
+# Environment file (do NOT include secrets in image)
+.env
