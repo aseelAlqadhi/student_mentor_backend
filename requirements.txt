@@ -35,4 +35,4 @@ typing_extensions==4.14.1
 uritemplate==4.2.0
 urllib3==2.5.0
 uvicorn==0.35.0
-python-jose[cryptograghy]
+python-jose[cryptography]
