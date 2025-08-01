@@ -7,11 +7,14 @@ from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
-from app.models import PromptResponse, PromptRequest
-from app.gemini import Gemini
-from app.auth.dependencies import get_user_identifier
-from app.auth.throttling import apply_rate_limit
-from app.auth.routes import router as auth_router
+from app.shared.models import PromptResponse, PromptRequest
+from app.features.profiles.services import get_user_context_for_ai
+from app.features.chat.ai.gemini import Gemini
+from app.api.v1.auth.dependencies import get_user_identifier
+from app.api.v1.auth.throttling import apply_rate_limit
+from app.api.v1.auth.routes import router as auth_router
+from app.api.v1.onboarding.routes import router as onboarding_router
+from app.api.v1.chat.routes import router as area_chat_router
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -26,6 +29,12 @@ app = FastAPI(
 
 # Include authentication routes
 app.include_router(auth_router)
+
+# Include onboarding routes
+app.include_router(onboarding_router)
+
+# Include area chat routes
+app.include_router(area_chat_router)
 
 # Mount static files for auth callback page
 try:
@@ -43,7 +52,7 @@ def load_system_prompt():
     """
     try:
         # Try to load from the correct path
-        with open("prompts/system_prompt.md", "r", encoding="utf-8") as f:
+        with open("app/features/chat/ai/system_prompt.md", "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
         # Return a default system prompt if file doesn't exist
@@ -77,8 +86,17 @@ async def chat(request: PromptRequest, user_id: str = Depends(get_user_identifie
     # Apply rate limiting
     apply_rate_limit(user_id)
     
-    # Get AI response
-    ai_reply = ai_platform.chat(request.prompt)
+    # Get user context for enhanced AI responses
+    user_context = await get_user_context_for_ai(user_id)
+    
+    # Prepare the prompt with user context if available
+    if user_context:
+        enhanced_prompt = f"User Context: {user_context}\n\nUser Question: {request.prompt}"
+    else:
+        enhanced_prompt = request.prompt
+    
+    # Get AI response with enhanced context
+    ai_reply = ai_platform.chat(enhanced_prompt)
     
     # Format the response
     formatted_reply = f'user: "{request.prompt}"\nmentor app: "{ai_reply}"'
