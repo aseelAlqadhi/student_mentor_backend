@@ -124,11 +124,14 @@ async def get_onboarding_questions():
                 "type": "select",
                 "required": True,
                 "options": [
-                    {"value": "supportive", "label": "Supportive - Encouraging and positive"},
-                    {"value": "action-oriented", "label": "Action-oriented - Focused on practical steps"},
-                    {"value": "analytical", "label": "Analytical - Detailed analysis and reasoning"},
-                    {"value": "empathetic", "label": "Empathetic - Understanding and compassionate"},
-                    {"value": "challenge-focused", "label": "Challenge-focused - Pushing you to grow"}
+                    {"value": "supportive_empathetic", "label": "Supportive - Encouraging and positive"},
+                    {"value": "action_oriented_practical", "label": "Action-oriented - Focused on practical steps"},
+                    {"value": "analytical_detailed", "label": "Analytical - Detailed analysis and reasoning"},
+                    {"value": "empathetic_understanding", "label": "Empathetic - Understanding and compassionate"},
+                    {"value": "challenge_focused_growth", "label": "Challenge-focused - Pushing you to grow"},
+                    {"value": "balanced_mixed", "label": "Balanced - Mix of empathy and practical advice"},
+                    {"value": "motivational_inspiring", "label": "Motivational - Energetic and inspiring"},
+                    {"value": "reflective_deepthinking", "label": "Reflective - Helps you analyze and think deeply"}
                 ]
             }
         ]
