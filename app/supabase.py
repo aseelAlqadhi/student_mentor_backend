@@ -7,6 +7,8 @@ import os
 from typing import Optional, Dict, Any
 from supabase import create_client, Client
 from dotenv import load_dotenv
+import jwt
+from jwt.exceptions import InvalidTokenError
 
 # Load environment variables
 load_dotenv()
@@ -14,12 +16,17 @@ load_dotenv()
 # Supabase configuration
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+# --- NEW: Load the JWT Secret ---
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
 
 # Validate required environment variables
 if not SUPABASE_URL:
     raise ValueError("SUPABASE_URL environment variable is required")
 if not SUPABASE_ANON_KEY:
     raise ValueError("SUPABASE_ANON_KEY environment variable is required")
+# --- NEW: Validate the JWT Secret ---
+if not SUPABASE_JWT_SECRET:
+    raise ValueError("SUPABASE_JWT_SECRET environment variable is required for token verification")
 
 # Initialize Supabase client
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -27,55 +34,44 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 def get_supabase_client() -> Client:
     """
     Get the Supabase client instance.
-    
-    Returns:
-        Client: The initialized Supabase client
     """
     return supabase
 
 async def get_user_by_token(token: str) -> Optional[Dict[str, Any]]:
     """
-    Get user information from Supabase using a JWT token.
-    
-    Args:
-        token (str): The JWT token from Supabase auth
-        
-    Returns:
-        Optional[Dict[str, Any]]: User data if token is valid, None otherwise
+    Get user information from a JWT by securely verifying it with the project's JWT secret.
     """
     try:
-        # Create a new client instance for this request
-        from supabase import create_client
-        temp_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+        # --- CORRECTED LOGIC ---
+        # Decode the JWT and verify its signature using the secret key.
+        # The 'audience' must be 'authenticated' for Supabase tokens.
+        decoded = jwt.decode(
+            token, 
+            SUPABASE_JWT_SECRET, 
+            algorithms=["HS256"], 
+            audience="authenticated"
+        )
         
-        # Try to get user info directly from the token
-        # First, let's try to decode the JWT to get user info
-        import jwt
-        from jwt.exceptions import InvalidTokenError
+        user_id = decoded.get('sub')
+        email = decoded.get('email')
         
-        try:
-            # Decode the JWT without verification first to see the payload
-            decoded = jwt.decode(token, options={"verify_signature": False})
-            
-            # Extract user info from the JWT payload
-            user_id = decoded.get('sub')
-            email = decoded.get('email')
-            
-            if user_id and email:
-                return {
-                    "id": user_id,
-                    "email": email,
-                    "email_verified": decoded.get('user_metadata', {}).get('email_verified', False),
-                    "created_at": None,  # We don't have this in the JWT
-                    "updated_at": None   # We don't have this in the JWT
-                }
-            else:
-                return None
-                
-        except InvalidTokenError:
-            return None
-            
-    except Exception:
+        if user_id and email:
+            return {
+                "id": user_id,
+                "email": email,
+                "aud": decoded.get('aud'),
+                "role": decoded.get('role'),
+                "app_metadata": decoded.get('app_metadata', {}),
+                "user_metadata": decoded.get('user_metadata', {})
+            }
+        return None
+        
+    except InvalidTokenError as e:
+        # This will catch expired tokens, invalid signatures, etc.
+        print(f"JWT Verification Error: {e}")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred during token verification: {e}")
         return None
 
 async def create_user(email: str, password: str) -> Dict[str, Any]:
