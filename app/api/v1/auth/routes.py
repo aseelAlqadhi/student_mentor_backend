@@ -15,9 +15,10 @@ from app.api.v1.auth.throttling import (
     reset_all_rate_limits,
     update_rate_limit_config
 )
-from app.features.profiles.services import get_user_profile
+# --- IMPORT THE PROFILE SERVICE ---
+from app.features.profiles.services import get_user_profile, create_user_profile
 from datetime import datetime
-
+from app.features.profiles.services import create_user_profile
 # Create router for auth endpoints
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -32,61 +33,50 @@ def convert_datetime_to_string(dt) -> Optional[str]:
         return dt
     return dt.isoformat()
 
-@router.post("/signup", response_model=AuthResponse)
+@router.post("/signup")
 async def signup(user_data: UserSignUp):
     """
-    Register a new user with email and password.
-    
-    Args:
-        user_data: User registration data (email, password)
-        
-    Returns:
-        AuthResponse: Authentication response with user data and access token
+    Handles user registration by creating an auth user and their database profile.
     """
     try:
-        # Create user in Supabase
-        response = supabase.auth.sign_up({
+        # Step 1: Create the user in Supabase Auth
+        auth_response = supabase.auth.sign_up({
             "email": user_data.email,
-            "password": user_data.password
+            "password": user_data.password,
         })
-        
-        if response.user:
-            # Generate access token
-            token_response = supabase.auth.sign_in_with_password({
-                "email": user_data.email,
-                "password": user_data.password
-            })
-            
-            # Calculate expires_in from the session
-            expires_in = None
-            if hasattr(token_response.session, 'expires_at') and token_response.session.expires_at:
-                import time
-                current_time = int(time.time())
-                expires_in = token_response.session.expires_at - current_time
-            
-            return AuthResponse(
-                user=UserResponse(
-                    id=response.user.id,
-                    email=response.user.email,
-                    created_at=response.user.created_at
-                ),
-                access_token=token_response.session.access_token,
-                refresh_token=token_response.session.refresh_token,
-                expires_in=expires_in,
-                message="User registered successfully. Please check your email for confirmation."
-            )
-        else:
+
+        if not auth_response.user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to create user"
+                detail="Registration failed. This email may already be in use."
             )
+        
+        new_user = auth_response.user
+
+        # Step 2: Create the corresponding user profile
+        try:
+            # CORRECTED: Call create_user_profile with only the user_id
+            await create_user_profile(new_user.id)
+        except Exception as profile_error:
+            print(f"CRITICAL: Profile creation failed for user {new_user.id}: {profile_error}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not initialize user profile after registration."
+            )
+
+        # Step 3: Return a simple success message
+        return {"message": "User registered successfully. Please check your email for confirmation."}
             
     except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Registration failed: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred during signup: {str(e)}"
         )
 
+# --- The rest of your file (signin, me, etc.) remains the same ---
+# ... (signin, signout, me, and rate-limit routes are unchanged) ...
 @router.post("/signin", response_model=AuthResponse)
 async def signin(user_data: UserSignIn):
     """

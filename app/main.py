@@ -2,7 +2,7 @@
 Main FastAPI application for the AI mentorship backend.
 This module sets up the FastAPI app with authentication and chat endpoints.
 """
-
+from app import config
 from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
