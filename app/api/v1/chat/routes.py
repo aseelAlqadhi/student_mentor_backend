@@ -29,8 +29,8 @@ for area in get_available_areas():
 
 @router.post("/{area}", response_model=AreaChatResponse)
 async def area_chat(
+    request: AreaChatRequest,
     area: str = Path(..., description="Chat area: health, career, finance, or general"),
-    request: AreaChatRequest = None,
     user_id: str = Depends(get_user_identifier)
 ):
     """
